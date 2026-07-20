@@ -69,7 +69,7 @@ Tasks are ordered so that foundational components (project structure, data model
     - Generate tokens with various expiration times using Hypothesis
     - **Validates: Requirements 2.6**
 
-- [~] 3. Checkpoint - Ensure all tests pass
+- [x] 3. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 4. Implement Financial Research MCP Server
@@ -118,7 +118,7 @@ Tasks are ordered so that foundational components (project structure, data model
     - Use mocked Bedrock Knowledge Base, Hypothesis for query string generation
     - **Validates: Requirements 4.3, 4.4, 4.5, 4.7**
 
-- [~] 6. Checkpoint - Ensure all tests pass
+- [x] 6. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 7. Implement Strands Agent Runtime
@@ -166,7 +166,7 @@ Tasks are ordered so that foundational components (project structure, data model
     - Implement `GET /api/chat/trace/{request_id}` — get trace data for a specific request
     - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
 
-- [~] 9. Checkpoint - Ensure all tests pass
+- [x] 9. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 10. Implement Frontend — Authentication
@@ -193,7 +193,7 @@ Tasks are ordered so that foundational components (project structure, data model
     - Implement sign-out button that invalidates session and redirects to sign-in page
     - _Requirements: 2.1, 2.3, 2.4, 2.5, 2.7_
 
-- [ ] 11. Implement Frontend — Chat Interface
+- [x] 11. Implement Frontend — Chat Interface
   - [x] 11.1 Implement chat interface and message display
     - Create `ChatInterface` component with message input (1-2000 char validation), message list, and streaming response display
     - Implement loading indicator while agent processes (up to 30 seconds)
@@ -202,21 +202,21 @@ Tasks are ordered so that foundational components (project structure, data model
     - Implement error display when message fails to persist (retain unsent message text in input)
     - _Requirements: 5.1, 5.5, 5.7, 5.8, 10.2_
 
-  - [-] 11.2 Implement tool invocation panel and trace viewer
+  - [x] 11.2 Implement tool invocation panel and trace viewer
     - Create `ToolInvocationPanel` component showing MCP server name, tool name, and status (pending/succeeded/failed) for each invocation
     - Create `TraceViewer` component showing sequence of agent reasoning steps and tool calls with timing data
     - Display trace view within 3 seconds of request completion
     - Display error message indicating which MCP server/tool failed when agent encounters error
     - _Requirements: 5.4, 5.6, 9.2_
 
-  - [-] 11.3 Implement conversation sidebar and management
+  - [x] 11.3 Implement conversation sidebar and management
     - Create `ConversationSidebar` component listing previous conversations ordered by most recent activity (max 50)
     - Implement "New Conversation" button that starts fresh context without prior history
     - Preserve previous conversations in sidebar when starting new conversation
     - Load conversation history on sign-in
     - _Requirements: 10.3, 10.4_
 
-- [~] 12. Checkpoint - Ensure all tests pass
+- [x] 12. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 13. Implement Infrastructure Configuration
@@ -254,8 +254,8 @@ Tasks are ordered so that foundational components (project structure, data model
     - Add health check endpoints for systemd watchdog monitoring
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 14. Wire components together and integration
-  - [~] 14.1 Connect frontend to backend API
+- [x] 14. Wire components together and integration
+  - [x] 14.1 Connect frontend to backend API
     - Configure API base URL and authentication header injection
     - Implement request/response interceptors for token refresh and error handling
     - Connect chat interface to `POST /api/chat/message` endpoint
@@ -263,14 +263,14 @@ Tasks are ordered so that foundational components (project structure, data model
     - Connect trace viewer to `GET /api/chat/trace/{request_id}` endpoint
     - _Requirements: 5.1, 5.4, 9.2, 10.3_
 
-  - [~] 14.2 Wire agent runtime to backend API
+  - [x] 14.2 Wire agent runtime to backend API
     - Integrate agent invocation into chat message endpoint
     - Pass tool invocation details and trace data from agent to API response
     - Implement response streaming from agent to frontend
     - Handle agent timeout (30s) at API level
     - _Requirements: 5.1, 5.3, 5.5, 5.7_
 
-  - [~] 14.3 Write integration tests
+  - [x] 14.3 Write integration tests
     - Test full registration and sign-in flow against mocked Cognito
     - Test chat message flow from API through agent to MCP servers (mocked Bedrock)
     - Test conversation CRUD operations against mocked DynamoDB
@@ -278,7 +278,7 @@ Tasks are ordered so that foundational components (project structure, data model
     - Test service startup sequence
     - _Requirements: 1.2, 2.1, 5.1, 8.3, 10.1_
 
-- [~] 15. Final checkpoint - Ensure all tests pass
+- [x] 15. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

@@ -64,17 +64,13 @@ Resources:
         MinTTL: 0
         ParametersInCacheKeyAndForwardedToOrigin:
           CookiesConfig:
-            CookieBehavior: all
+            CookieBehavior: none
           EnableAcceptEncodingBrotli: false
           EnableAcceptEncodingGzip: false
           HeadersConfig:
-            HeaderBehavior: whitelist
-            Headers:
-              - Authorization
-              - Content-Type
-              - Accept
+            HeaderBehavior: none
           QueryStringsConfig:
-            QueryStringBehavior: all
+            QueryStringBehavior: none
 
   # Origin request policy to forward host header and auth to EC2
   APIOriginRequestPolicy:

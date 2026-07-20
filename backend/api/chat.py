@@ -213,13 +213,16 @@ async def send_message(
         tool_invocations=tool_invocations_storage,
     )
 
+    # Build trace dict from agent response trace data
+    trace_dict = agent_response.trace.model_dump() if agent_response.trace else None
+
     return ChatMessageResponse(
         conversation_id=conversation_id,
         message_id=assistant_message_id,
         role="assistant",
         content=response_content,
         tool_invocations=tool_invocations_response,
-        trace=None,
+        trace=trace_dict,
         timestamp=assistant_timestamp.isoformat(),
     )
 

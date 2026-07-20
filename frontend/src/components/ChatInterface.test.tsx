@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ChatInterface } from "./ChatInterface";
+import { configureApiClient } from "@/api/client";
 
 // Mock useAuth
 vi.mock("@/auth/AuthContext", () => ({
@@ -17,6 +18,11 @@ describe("ChatInterface", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     mockFetch.mockReset();
+    configureApiClient({
+      baseUrl: "/api",
+      getSessionToken: () => "mock-token-123",
+      onUnauthorized: () => {},
+    });
   });
 
   afterEach(() => {
@@ -76,6 +82,7 @@ describe("ChatInterface", () => {
     vi.useRealTimers();
     mockFetch.mockResolvedValueOnce({
       ok: true,
+      headers: new Headers({ "content-type": "application/json" }),
       json: async () => ({
         response: "Hello from the agent!",
         message_id: "msg-1",
@@ -100,6 +107,7 @@ describe("ChatInterface", () => {
     vi.useRealTimers();
     mockFetch.mockResolvedValueOnce({
       ok: true,
+      headers: new Headers({ "content-type": "application/json" }),
       json: async () => ({ response: "OK" }),
     });
 
@@ -128,7 +136,7 @@ describe("ChatInterface", () => {
 
   it("retains message in input on send failure", async () => {
     vi.useRealTimers();
-    mockFetch.mockRejectedValueOnce(new Error("Network error"));
+    mockFetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
 
     render(<ChatInterface />);
     const input = screen.getByLabelText(/chat message input/i) as HTMLTextAreaElement;
@@ -139,13 +147,21 @@ describe("ChatInterface", () => {
       expect(input.value).toBe("My important message");
     });
     expect(
-      await screen.findByText(/failed to send message/i)
+      await screen.findByText(/network error/i)
     ).toBeInTheDocument();
   });
 
   it("displays timeout message after 30 seconds", async () => {
+    // Mock fetch that respects abort signal
     mockFetch.mockImplementation(
-      () => new Promise(() => {}) // Never resolves
+      (_url: string, opts?: { signal?: AbortSignal }) =>
+        new Promise((_, reject) => {
+          if (opts?.signal) {
+            opts.signal.addEventListener("abort", () => {
+              reject(new DOMException("The operation was aborted.", "AbortError"));
+            });
+          }
+        })
     );
 
     render(<ChatInterface />);
@@ -219,6 +235,7 @@ describe("ChatInterface", () => {
     const onCreated = vi.fn();
     mockFetch.mockResolvedValueOnce({
       ok: true,
+      headers: new Headers({ "content-type": "application/json" }),
       json: async () => ({
         response: "Hi!",
         conversation_id: "new-conv-456",

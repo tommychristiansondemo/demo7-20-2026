@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/auth/AuthContext";
+import { api, ApiRequestError, NetworkError } from "@/api/client";
 
 interface Message {
   id: string;
@@ -26,7 +27,7 @@ const MAX_MESSAGE_LENGTH = 2000;
 const TIMEOUT_MS = 30000;
 
 export function ChatInterface({ conversationId, onConversationCreated }: ChatInterfaceProps) {
-  const { sessionToken } = useAuth();
+  useAuth(); // Ensure user is authenticated
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -34,7 +35,6 @@ export function ChatInterface({ conversationId, onConversationCreated }: ChatInt
   const [sendError, setSendError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -82,46 +82,18 @@ export function ChatInterface({ conversationId, onConversationCreated }: ChatInt
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
-    // Set up 30-second timeout
-    timeoutRef.current = setTimeout(() => {
-      abortController.abort();
-      setIsLoading(false);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: "Request timed out. The agent could not complete processing within 30 seconds. Please try again or rephrase your question.",
-          timestamp: new Date().toISOString(),
-          error: true,
-        },
-      ]);
-    }, TIMEOUT_MS);
-
     try {
-      const response = await fetch("/api/chat/message", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${sessionToken}`,
-        },
-        body: JSON.stringify({
-          message: trimmed,
-          conversation_id: conversationId,
-        }),
-        signal: abortController.signal,
-      });
-
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await api.post<{
+        conversation_id?: string;
+        message_id?: string;
+        response?: string;
+        content?: string;
+        tool_invocations?: ToolInvocation[];
+      }>(
+        "/chat/message",
+        { message: trimmed, conversation_id: conversationId },
+        { signal: abortController.signal, timeout: TIMEOUT_MS, maxRetries: 0 }
+      );
 
       if (data.conversation_id && !conversationId && onConversationCreated) {
         onConversationCreated(data.conversation_id);
@@ -137,22 +109,34 @@ export function ChatInterface({ conversationId, onConversationCreated }: ChatInt
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err: unknown) {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-
-      // If aborted by timeout, the timeout handler already set the error message
-      if (err instanceof Error && err.name === "AbortError") {
-        // Timeout already handled - restore input so user can retry
+      // If caller aborted, just restore input
+      if (abortController.signal.aborted) {
         setInputValue(previousInput);
         setIsLoading(false);
         return;
       }
 
+      if (err instanceof NetworkError && err.message.includes("timed out")) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: "Request timed out. The agent could not complete processing within 30 seconds. Please try again or rephrase your question.",
+            timestamp: new Date().toISOString(),
+            error: true,
+          },
+        ]);
+        return;
+      }
+
       // Persist error — retain unsent message in input
       setInputValue(previousInput);
-      setSendError("Failed to send message. Please try again.");
+      const errorMessage =
+        err instanceof ApiRequestError || err instanceof NetworkError
+          ? err.message
+          : "Failed to send message. Please try again.";
+      setSendError(errorMessage);
       // Remove the user message we optimistically added
       setMessages((prev) => prev.filter((m) => m.id !== userMessage.id));
     } finally {
