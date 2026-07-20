@@ -1,0 +1,45 @@
+[Unit]
+Description=Bedrock AgentCore Demo - Agent Runtime
+Documentation=https://github.com/aws-samples/bedrock-agentcore-demo
+After=network-online.target agentcore-financial-mcp.service agentcore-knowledge-base-mcp.service
+Wants=network-online.target
+Requires=agentcore-financial-mcp.service agentcore-knowledge-base-mcp.service
+
+# Restart limits: max 5 restarts within 60 seconds
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+Type=exec
+User=agentcore
+Group=agentcore
+WorkingDirectory=/opt/bedrock-agentcore-demo
+Environment=PATH=/opt/bedrock-agentcore-demo/.venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONPATH=/opt/bedrock-agentcore-demo
+Environment=FINANCIAL_MCP_URL=http://localhost:8001/mcp
+Environment=KNOWLEDGE_BASE_MCP_URL=http://localhost:8002/mcp
+Environment=AWS_DEFAULT_REGION=us-east-1
+Environment=BEDROCK_MODEL_ID=anthropic.claude-sonnet-4-20250514
+
+ExecStart=/opt/bedrock-agentcore-demo/.venv/bin/python -m agent.runtime
+
+# Auto-restart on crash with 10-second delay
+Restart=on-failure
+RestartSec=10
+
+# Health check: Agent runtime health monitored via systemd watchdog
+WatchdogSec=30
+
+# Process limits
+TimeoutStartSec=60
+TimeoutStopSec=15
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/bedrock-agentcore-demo/logs
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

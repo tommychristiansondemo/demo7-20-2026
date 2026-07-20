@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: DynamoDB table for AgentCore demo conversation storage (single-table design)
+
+Resources:
+  ConversationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: agentcore-demo-conversations
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: bedrock-agentcore-demo
+        - Key: Environment
+          Value: demo
+
+Outputs:
+  TableName:
+    Description: Name of the DynamoDB conversations table
+    Value: !Ref ConversationsTable
+  TableArn:
+    Description: ARN of the DynamoDB conversations table
+    Value: !GetAtt ConversationsTable.Arn
+  GSI1Name:
+    Description: Name of GSI1 for listing conversations by recent activity
+    Value: GSI1

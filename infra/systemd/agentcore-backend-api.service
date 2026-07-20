@@ -1,0 +1,45 @@
+[Unit]
+Description=Bedrock AgentCore Demo - Backend API (port 8000)
+Documentation=https://github.com/aws-samples/bedrock-agentcore-demo
+After=network-online.target
+Wants=network-online.target
+
+# Restart limits: max 5 restarts within 60 seconds
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+Type=exec
+User=agentcore
+Group=agentcore
+WorkingDirectory=/opt/bedrock-agentcore-demo
+Environment=PATH=/opt/bedrock-agentcore-demo/.venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONPATH=/opt/bedrock-agentcore-demo
+Environment=API_PORT=8000
+Environment=FINANCIAL_MCP_URL=http://localhost:8001/mcp
+Environment=KNOWLEDGE_BASE_MCP_URL=http://localhost:8002/mcp
+Environment=AWS_DEFAULT_REGION=us-east-1
+
+ExecStart=/opt/bedrock-agentcore-demo/.venv/bin/python -m uvicorn backend.api:app --host 0.0.0.0 --port 8000
+
+# Auto-restart on crash with 10-second delay
+Restart=on-failure
+RestartSec=10
+
+# Health check: GET /health endpoint on port 8000
+# Use systemd watchdog for monitoring
+WatchdogSec=30
+
+# Process limits
+TimeoutStartSec=30
+TimeoutStopSec=15
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/bedrock-agentcore-demo/logs
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

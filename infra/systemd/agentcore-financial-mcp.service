@@ -1,0 +1,43 @@
+[Unit]
+Description=Bedrock AgentCore Demo - Financial Research MCP Server (port 8001)
+Documentation=https://github.com/aws-samples/bedrock-agentcore-demo
+After=network-online.target
+Wants=network-online.target
+
+# Restart limits: max 5 restarts within 60 seconds
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+Type=exec
+User=agentcore
+Group=agentcore
+WorkingDirectory=/opt/bedrock-agentcore-demo
+Environment=PATH=/opt/bedrock-agentcore-demo/.venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONPATH=/opt/bedrock-agentcore-demo
+Environment=FINANCIAL_MCP_PORT=8001
+Environment=AWS_DEFAULT_REGION=us-east-1
+
+ExecStart=/opt/bedrock-agentcore-demo/.venv/bin/python -m mcp_servers.financial_research.server
+
+# Auto-restart on crash with 10-second delay
+Restart=on-failure
+RestartSec=10
+
+# Health check: GET /health endpoint on port 8001
+# Use systemd watchdog for monitoring
+WatchdogSec=30
+
+# Process limits
+TimeoutStartSec=30
+TimeoutStopSec=15
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/bedrock-agentcore-demo/logs
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

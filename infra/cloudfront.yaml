@@ -1,0 +1,224 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  CloudFront distribution for Bedrock AgentCore Demo.
+  Serves static assets from S3 and forwards /api/* requests to EC2 origin.
+
+Parameters:
+  EC2InstancePublicDNS:
+    Type: String
+    Description: Public DNS name of the EC2 instance hosting the backend API
+    AllowedPattern: '.+'
+    ConstraintDescription: EC2 instance public DNS must not be empty
+
+  ACMCertificateArn:
+    Type: String
+    Description: ARN of the ACM certificate for www.awsteach.com (must be in us-east-1)
+    AllowedPattern: 'arn:aws:acm:us-east-1:\d{12}:certificate/.+'
+    ConstraintDescription: Must be a valid ACM certificate ARN in us-east-1
+
+  StaticAssetsBucketName:
+    Type: String
+    Description: Name of the S3 bucket containing the built frontend static assets
+    AllowedPattern: '[a-z0-9][a-z0-9\-]{1,61}[a-z0-9]'
+    ConstraintDescription: Must be a valid S3 bucket name
+
+Resources:
+  # Origin Access Control for S3 bucket
+  CloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${AWS::StackName}-s3-oac'
+        Description: OAC for static assets S3 bucket
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # Cache policy for static assets (max-age 86400 seconds)
+  StaticAssetsCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub '${AWS::StackName}-static-cache-policy'
+        DefaultTTL: 86400
+        MaxTTL: 86400
+        MinTTL: 0
+        ParametersInCacheKeyAndForwardedToOrigin:
+          CookiesConfig:
+            CookieBehavior: none
+          EnableAcceptEncodingBrotli: true
+          EnableAcceptEncodingGzip: true
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: none
+
+  # Cache policy for API requests (no caching, forward all)
+  APICachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub '${AWS::StackName}-api-no-cache-policy'
+        DefaultTTL: 0
+        MaxTTL: 0
+        MinTTL: 0
+        ParametersInCacheKeyAndForwardedToOrigin:
+          CookiesConfig:
+            CookieBehavior: all
+          EnableAcceptEncodingBrotli: false
+          EnableAcceptEncodingGzip: false
+          HeadersConfig:
+            HeaderBehavior: whitelist
+            Headers:
+              - Authorization
+              - Content-Type
+              - Accept
+          QueryStringsConfig:
+            QueryStringBehavior: all
+
+  # Origin request policy to forward host header and auth to EC2
+  APIOriginRequestPolicy:
+    Type: AWS::CloudFront::OriginRequestPolicy
+    Properties:
+      OriginRequestPolicyConfig:
+        Name: !Sub '${AWS::StackName}-api-origin-request-policy'
+        CookiesConfig:
+          CookieBehavior: all
+        HeadersConfig:
+          HeaderBehavior: whitelist
+          Headers:
+            - Authorization
+            - Content-Type
+            - Accept
+            - Host
+        QueryStringsConfig:
+          QueryStringBehavior: all
+
+  # CloudFront distribution
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: Bedrock AgentCore Demo - www.awsteach.com
+        Aliases:
+          - www.awsteach.com
+        ViewerCertificate:
+          AcmCertificateArn: !Ref ACMCertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        PriceClass: PriceClass_100
+
+        # Origins
+        Origins:
+          # S3 origin for static assets
+          - Id: S3StaticAssets
+            DomainName: !Sub '${StaticAssetsBucketName}.s3.amazonaws.com'
+            OriginAccessControlId: !GetAtt CloudFrontOriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+
+          # EC2 origin for API requests
+          - Id: EC2APIOrigin
+            DomainName: !Ref EC2InstancePublicDNS
+            CustomOriginConfig:
+              HTTPPort: 8000
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only
+              OriginReadTimeout: 30
+              OriginKeepaliveTimeout: 5
+
+        # Default behavior: serve static assets from S3
+        DefaultCacheBehavior:
+          TargetOriginId: S3StaticAssets
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: !Ref StaticAssetsCachePolicy
+          Compress: true
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+
+        # Cache behaviors (ordered)
+        CacheBehaviors:
+          # /api/* forwarded to EC2 origin
+          - PathPattern: '/api/*'
+            TargetOriginId: EC2APIOrigin
+            ViewerProtocolPolicy: redirect-to-https
+            CachePolicyId: !Ref APICachePolicy
+            OriginRequestPolicyId: !Ref APIOriginRequestPolicy
+            Compress: true
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+              - PUT
+              - POST
+              - PATCH
+              - DELETE
+            CachedMethods:
+              - GET
+              - HEAD
+
+        # Custom error responses for SPA routing (return index.html for 403/404)
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 10
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 10
+
+  # S3 bucket policy to allow CloudFront OAC access and enforce SSL
+  StaticAssetsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref StaticAssetsBucketName
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowCloudFrontServicePrincipal
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub 'arn:aws:s3:::${StaticAssetsBucketName}/*'
+            Condition:
+              StringEquals:
+                'AWS:SourceArn': !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}'
+          - Sid: DenyNonSSLRequests
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${StaticAssetsBucketName}'
+              - !Sub 'arn:aws:s3:::${StaticAssetsBucketName}/*'
+            Condition:
+              Bool:
+                'aws:SecureTransport': 'false'
+
+Outputs:
+  DistributionId:
+    Description: CloudFront distribution ID
+    Value: !Ref CloudFrontDistribution
+    Export:
+      Name: !Sub '${AWS::StackName}-DistributionId'
+
+  DistributionDomainName:
+    Description: CloudFront distribution domain name
+    Value: !GetAtt CloudFrontDistribution.DomainName
+    Export:
+      Name: !Sub '${AWS::StackName}-DistributionDomainName'
+
+  DistributionArn:
+    Description: CloudFront distribution ARN
+    Value: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}'
+    Export:
+      Name: !Sub '${AWS::StackName}-DistributionArn'

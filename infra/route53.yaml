@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Route 53 DNS configuration for awsteach.com - A-type alias records pointing to CloudFront distribution
+
+Parameters:
+  HostedZoneId:
+    Type: AWS::Route53::HostedZone::Id
+    Description: The Route 53 hosted zone ID for awsteach.com
+
+  CloudFrontDistributionDomainName:
+    Type: String
+    Description: The domain name of the CloudFront distribution (e.g., d1234abcdef.cloudfront.net)
+
+Resources:
+  WwwRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: www.awsteach.com
+      Type: A
+      AliasTarget:
+        DNSName: !Ref CloudFrontDistributionDomainName
+        HostedZoneId: Z2FDTNDATAQYW2  # CloudFront hosted zone ID (global constant)
+        EvaluateTargetHealth: false
+
+  ApexRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: awsteach.com
+      Type: A
+      AliasTarget:
+        DNSName: !Ref CloudFrontDistributionDomainName
+        HostedZoneId: Z2FDTNDATAQYW2  # CloudFront hosted zone ID (global constant)
+        EvaluateTargetHealth: false
+
+Outputs:
+  WwwRecordName:
+    Description: The www DNS record name
+    Value: !Ref WwwRecord
+
+  ApexRecordName:
+    Description: The apex DNS record name
+    Value: !Ref ApexRecord
