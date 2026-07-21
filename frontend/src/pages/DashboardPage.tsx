@@ -38,12 +38,20 @@ export function DashboardPage() {
             You're signed in to the Bedrock AgentCore Demo. Use the chat to
             interact with the AI agent.
           </p>
-          <button
-            onClick={() => navigate("/chat")}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-          >
-            Open Chat
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => navigate("/chat")}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+            >
+              Open Chat
+            </button>
+            <button
+              onClick={() => navigate("/observe")}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            >
+              Observability Dashboard
+            </button>
+          </div>
         </div>
       </main>
     </div>

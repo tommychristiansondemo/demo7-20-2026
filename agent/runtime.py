@@ -28,7 +28,7 @@ from backend.models.conversation import TraceData
 logger = logging.getLogger(__name__)
 
 # Agent configuration
-MODEL_ID = "anthropic.claude-sonnet-4-20250514"
+MODEL_ID = "us.anthropic.claude-sonnet-4-6"
 AWS_REGION = "us-east-1"
 MAX_TOOL_CALLS = 10
 REQUEST_TIMEOUT_SECONDS = 30
@@ -37,14 +37,14 @@ SYSTEM_PROMPT = (
     "You are a helpful AI assistant for an AWS class titled "
     "'Building Agentic AI with Amazon Bedrock AgentCore,' "
     "taught to employees of Ameriprise Financial. "
-    "You have access to two sets of tools:\n\n"
-    "1. **Financial Research tools** — retrieve stock quotes, company profiles, "
-    "and market summaries for financial analysis relevant to Ameriprise Financial.\n"
-    "2. **Knowledge Base tools** — query AWS Bedrock AgentCore documentation and "
-    "course materials for retrieval-augmented generation.\n\n"
+    "You have access to Financial Research tools that can retrieve stock quotes, "
+    "company profiles, and market summaries for financial analysis relevant to "
+    "Ameriprise Financial.\n\n"
     "Use these tools to answer questions accurately. When you use a tool, explain "
     "what you found. If a tool returns an error, inform the user clearly and suggest "
-    "they rephrase their question or try again later."
+    "they rephrase their question or try again later. "
+    "You can also answer general questions about AWS, agentic AI, Bedrock AgentCore, "
+    "and the course concepts using your own knowledge."
 )
 
 
@@ -66,6 +66,7 @@ class AgentResponse:
     tool_invocations: list[ToolInvocationDetail] = field(default_factory=list)
     trace: TraceData | None = None
     timed_out: bool = False
+    thinking_content: str = ""
 
 
 def _create_financial_mcp_client() -> MCPClient:
@@ -85,24 +86,28 @@ def _create_knowledge_base_mcp_client() -> MCPClient:
 
 
 def _create_model() -> BedrockModel:
-    """Create the Bedrock model instance."""
+    """Create the Bedrock model instance with extended thinking enabled."""
     return BedrockModel(
         model_id=MODEL_ID,
         region_name=AWS_REGION,
+        model_kwargs={
+            "thinking": {
+                "type": "enabled",
+                "budget_tokens": 5000,
+            }
+        },
     )
 
 
 def create_agent(
     model: BedrockModel | None = None,
     financial_mcp: MCPClient | None = None,
-    knowledge_mcp: MCPClient | None = None,
 ) -> Agent:
     """Create and configure the Strands Agent with MCP tool connections.
 
     Args:
         model: Optional BedrockModel override (for testing).
         financial_mcp: Optional MCPClient override for Financial Research (for testing).
-        knowledge_mcp: Optional MCPClient override for Knowledge Base (for testing).
 
     Returns:
         Configured Agent instance.
@@ -111,12 +116,10 @@ def create_agent(
         model = _create_model()
     if financial_mcp is None:
         financial_mcp = _create_financial_mcp_client()
-    if knowledge_mcp is None:
-        knowledge_mcp = _create_knowledge_base_mcp_client()
 
     agent = Agent(
         model=model,
-        tools=[financial_mcp, knowledge_mcp],
+        tools=[financial_mcp],
         system_prompt=SYSTEM_PROMPT,
     )
     return agent
@@ -203,6 +206,9 @@ async def process_message(agent: Agent, message: str) -> AgentResponse:
     # Extract response text from result message
     response_text = _extract_response_text(result)
 
+    # Extract thinking content from result
+    thinking_content = extract_thinking_content(result)
+
     # Extract tool invocation details from metrics/messages
     tool_invocations = _extract_tool_invocations(result, start_time)
 
@@ -211,6 +217,7 @@ async def process_message(agent: Agent, message: str) -> AgentResponse:
         tool_invocations=tool_invocations,
         trace=trace_data,
         timed_out=False,
+        thinking_content=thinking_content,
     )
 
 
@@ -224,6 +231,24 @@ def _extract_response_text(result) -> str:
         if text_parts:
             return "\n".join(text_parts)
     return ""
+
+
+def extract_thinking_content(result) -> str:
+    """Extract thinking content from agent result.
+
+    Iterates through response message content blocks, collecting
+    any blocks with type 'thinking' and concatenating their text.
+
+    Returns empty string if no thinking blocks found.
+    """
+    if not result.message or not result.message.get("content"):
+        return ""
+
+    thinking_parts = []
+    for block in result.message["content"]:
+        if isinstance(block, dict) and block.get("type") == "thinking":
+            thinking_parts.append(block.get("thinking", ""))
+    return "\n".join(thinking_parts)
 
 
 def _extract_tool_invocations(result, start_time: float) -> list[ToolInvocationDetail]:

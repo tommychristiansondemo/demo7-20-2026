@@ -8,6 +8,7 @@ import {
   VerifyPage,
   DashboardPage,
   ChatPage,
+  ObservePage,
 } from "@/pages";
 
 function App() {
@@ -35,6 +36,14 @@ function App() {
               element={
                 <RouteGuard>
                   <ChatPage />
+                </RouteGuard>
+              }
+            />
+            <Route
+              path="/observe"
+              element={
+                <RouteGuard>
+                  <ObservePage />
                 </RouteGuard>
               }
             />

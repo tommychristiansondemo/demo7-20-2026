@@ -49,9 +49,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshSession = useCallback(async () => {
     try {
       const session = await fetchAuthSession();
-      const token = session.tokens?.idToken?.toString() ?? null;
+      const accessToken = session.tokens?.accessToken?.toString() ?? null;
 
-      if (token) {
+      if (accessToken) {
         const currentUser = await getCurrentUser();
         setState({
           isAuthenticated: true,
@@ -60,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             email: currentUser.signInDetails?.loginId ?? "",
             displayName: currentUser.username,
           },
-          sessionToken: token,
+          sessionToken: accessToken,
         });
       } else {
         setState({
@@ -96,7 +96,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [state.isAuthenticated, refreshSession]);
 
   const signIn = async (email: string, password: string) => {
-    await amplifySignIn({ username: email, password });
+    const result = await amplifySignIn({ username: email, password });
+    if (result.isSignedIn) {
+      // Immediately try to get the session after successful sign-in
+      try {
+        const session = await fetchAuthSession({ forceRefresh: true });
+        const accessToken = session.tokens?.accessToken?.toString() ?? null;
+        if (accessToken) {
+          let userEmail = email;
+          try {
+            const currentUser = await getCurrentUser();
+            userEmail = currentUser.signInDetails?.loginId ?? email;
+          } catch {
+            // Use the email we signed in with
+          }
+          setState({
+            isAuthenticated: true,
+            isLoading: false,
+            user: { email: userEmail },
+            sessionToken: accessToken,
+          });
+          return;
+        }
+      } catch {
+        // Fall through to refreshSession
+      }
+    }
     await refreshSession();
   };
 

@@ -9,7 +9,9 @@ from pydantic import BaseModel, Field
 
 from agent.runtime import AgentResponse, ToolInvocationDetail, create_agent, process_message
 from backend.db.dynamodb import DynamoDBClient
+from backend.db.telemetry import TelemetryDBClient, TelemetryRecord
 from backend.middleware.auth import CurrentUser, get_current_user
+from backend.utils.truncate import truncate_message
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +122,28 @@ def _build_tool_invocations_for_storage(invocations: list[ToolInvocationDetail])
     ]
 
 
+def _capture_telemetry(user_email: str, message: str, agent_response: AgentResponse) -> None:
+    """Capture telemetry for the observability dashboard.
+
+    Creates a TelemetryRecord and writes it to DynamoDB.
+    Failures are logged but do not interrupt the user response.
+    """
+    try:
+        record = TelemetryRecord(
+            record_id=uuid.uuid4().hex,
+            student_email=user_email,
+            message_preview=truncate_message(message, 100),
+            total_latency_ms=agent_response.trace.total_latency_ms if agent_response.trace else 0.0,
+            tool_call_count=agent_response.trace.tool_call_count if agent_response.trace else 0,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            thinking_content=agent_response.thinking_content or "",
+        )
+        db = TelemetryDBClient()
+        db.put_record(record)
+    except Exception as e:
+        logger.warning("Failed to capture telemetry: %s", str(e))
+
+
 # --- Endpoints ---
 
 
@@ -215,6 +239,9 @@ async def send_message(
 
     # Build trace dict from agent response trace data
     trace_dict = agent_response.trace.model_dump() if agent_response.trace else None
+
+    # Capture telemetry for the observability dashboard (non-blocking)
+    _capture_telemetry(user.email, request.message, agent_response)
 
     return ChatMessageResponse(
         conversation_id=conversation_id,

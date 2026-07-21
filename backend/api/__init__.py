@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from backend.api.auth import router as auth_router
 from backend.api.chat import router as chat_router
+from backend.api.observe import router as observe_router
 
 app = FastAPI(
     title="Bedrock AgentCore Demo API",
@@ -18,6 +19,7 @@ app = FastAPI(
 # Wire up routers
 app.include_router(auth_router)
 app.include_router(chat_router)
+app.include_router(observe_router)
 
 
 @app.get("/health", tags=["infrastructure"])
